@@ -34,7 +34,7 @@ my_slack_username = MY_USERNAME #e.g. zac.wentzell
 
 my_chatbot_name = 'zac_bot'
 
-slack_inbound_url = 'https://hooks.slack.com/services/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'
+slack_inbound_url = 'https://hooks.slack.com/services/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'
 
 
 def beautiful_soup_stack_overflow(question, tags=None, result_limit=5):
