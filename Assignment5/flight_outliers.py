@@ -228,6 +228,7 @@ def task_3_dbscan(flight_data):
         plt.plot(xy[:, 0], xy[:, 1], 'o', markerfacecolor = c, markeredgecolor = 'k',markersize = 14)
     
     plt.title('Total Clusters: {}'.format(clusters), fontsize = 14, y = 1.01) 
+    plt.savefig('task_3_dbscan.png')
 
     def calculate_cluster_means(X, labels):
         lbls = np.unique(labels)
