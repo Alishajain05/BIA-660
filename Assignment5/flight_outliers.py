@@ -22,12 +22,18 @@ from dateutil.parser import parse
 # from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.keys import Keys
+from statistics import mean
+from statistics import stdev
 
-driver = webdriver.Chrome()
-driver.get('https://www.google.com/flights/explore/')
-time.sleep(6)
+# driver = webdriver.Chrome()
+# driver.get('https://www.google.com/flights/explore/')
+# time.sleep(6)
 
 def scrape_data(start_date, from_place, to_place, city_name):
+    driver = webdriver.Chrome()
+    driver.get('https://www.google.com/flights/explore/')
+    time.sleep(6)
+
     to_input = driver.find_element_by_xpath('//*[@id="root"]/div[3]/div[3]/div/div[4]/div/div')
     to_input.click()
     to_action = ActionChains(driver)
@@ -92,10 +98,14 @@ def scrape_data(start_date, from_place, to_place, city_name):
     df = pd.DataFrame(clean_data, columns=['Price','Start_Date'])
     return df
 
-df = scrape_data('2017-04-16','New York','United States','Miami')
-print df
+# df = scrape_data('2017-04-16','New York','United States','Miami')
+# print df
 
 def scrape_data_90(start_date, from_place, to_place, city_name):
+    
+    driver = webdriver.Chrome()
+    driver.get('https://www.google.com/flights/explore/')
+    time.sleep(6)
     
     to_input = driver.find_element_by_xpath('//*[@id="root"]/div[3]/div[3]/div/div[4]/div/div')
     to_input.click()
@@ -194,5 +204,131 @@ def scrape_data_90(start_date, from_place, to_place, city_name):
     df_90 = pd.DataFrame(clean_data, columns=['Price','Start_Date'])
     return df_90   
     
-df_90 = scrape_data_90('2017-04-20','London','Europe','Dublin')
-print df_90
+# df_90 = scrape_data_90('2017-04-20','London','Europe','Dublin')
+# print 90
+
+def task_3_dbscan(flight_data):
+       
+    px = [x for x in df['Price']]
+    ff = pd.DataFrame(px, columns=['Price_of_flight']).reset_index()
+
+    X = MinMaxScaler().fit_transform(ff) 
+    db = DBSCAN(eps = 0.05, min_samples = 3).fit(X)
+
+    labels = db.labels_
+    clusters = len(set(labels))
+    unique_labels = set(labels)
+    colors = plt.cm.Spectral(np.linspace(0, 1, len(unique_labels)))
+
+    plt.subplots(figsize = (12,8))
+
+    for k,c in zip(unique_labels, colors):
+        class_member_mask = (labels == k)
+        xy = X[class_member_mask]
+        plt.plot(xy[:, 0], xy[:, 1], 'o', markerfacecolor = c, markeredgecolor = 'k',markersize = 14)
+    
+    plt.title('Total Clusters: {}'.format(clusters), fontsize = 14, y = 1.01) 
+
+    def calculate_cluster_means(X, labels):
+        lbls = np.unique(labels)
+        print "Cluster labels: {}".format(np.unique(lbls))
+
+        cluster_means = [np.mean(X[labels==num, :], axis=0) for num in range(lbls[-1] + 1)]
+        print "Cluster Means: {}".format(cluster_means)
+        return cluster_means
+
+    cluster_means = calculate_cluster_means(X, labels)
+
+    out_ind = []
+    for ind,y in enumerate(X):
+        if labels[ind]== -1:
+            out_ind.append([ind,y])
+
+    class_member_mask = (labels == -1) 
+    outs = X[class_member_mask]
+
+    chosen_list = []
+
+    for out_index,out in enumerate(outs):    
+        min_list = []
+        for index,cm in enumerate(cluster_means):         
+            min_list.append(euclidean(cm, out))
+
+        for inx,abc in enumerate(min_list):
+            if abc == sorted(min_list)[0]:
+                chosen_list.append([out_index,inx])
+            
+    outlier_prices = []
+    for i,abc in enumerate(out_ind):
+        outlier_prices.append(df['Price'][abc[0]])
+    
+    def cluster_mean_price(index):
+        clus_ind = []
+        for ind,y in enumerate(X):
+            if labels[ind]== index:
+                clus_ind.append([ind,y])
+    
+        class_member_mask_clus = (labels == index) 
+        clus = X[class_member_mask_clus] 
+    
+        clus_prices=[]
+        for i,abc in enumerate(clus_ind):
+            clus_prices.append(df['Price'][abc[0]])   
+
+        return clus_prices
+    
+    
+    mean_of_chosenlist_clusters= []
+    for b in chosen_list:
+        mean_of_chosenlist_clusters.append(mean(cluster_mean_price(b[1])))
+    
+    stdev_of_chosenlist=[]
+    for b in chosen_list:
+        stdev_of_chosenlist.append(stdev(cluster_mean_price(b[1])))
+    
+    outlier_indexes = []
+    for b in chosen_list:
+        outlier_indexes.append(b[0])
+
+    
+    df_best_price = pd.DataFrame(columns=('Start_Date','Price'))
+    best_price_count = 0
+    for x in range(0, (len(outlier_indexes))-1):    
+        m = int(mean_of_chosenlist_clusters[x])
+        s = int(stdev_of_chosenlist[x])
+        if (outlier_prices[x] <  (m - (2 * s))) and  (outlier_prices[x] < (m - 50)):
+            best_price_count += 1
+            df_best_price.loc[best_price_count] = df.loc[outlier_indexes[x]]
+        
+    return df_best_price
+
+def task_3_IQR(flight_data):    
+    df['Price'].plot.box()
+    plt.savefig('task_3_IQR.png')
+    
+    Q1 = df['Price'].quantile(0.25)
+    Q3 = df['Price'].quantile(0.75)
+    IQR = Q3 - Q1
+    
+#     i = 'Price'
+#     ax = df[i].plot(kind='kde')
+#     plt.subplot(212)
+#     plt.xlim(df[i].min(), df[i].max()*1.1)
+#     sns.boxplot(x=df[i])
+#     plt.axvline(x=min)
+#     plt.axvline(x=max)
+#     plt.savefig('task_3_IQR.png')
+
+    iqr_outlier_index = []
+    iqr_outlier_data = []
+
+    for i, x in enumerate(df['Price']):
+        if (x < abs(Q1 - (1.5 * IQR))) or (x > abs(Q3 + (1.5 * IQR))):
+            iqr_outlier_index.append(i)
+
+    for x in iqr_outlier_index:
+        iqr_outlier_data.append([df['Start_Date'][x], df['Price'][x]])
+
+    return pd.DataFrame(iqr_outlier_data, columns=['Start_Date', 'Price'])
+
+
